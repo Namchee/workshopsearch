@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/lib/pq"
-	_ "github.com/lib/pq"
 
 	"github.com/nsqio/go-nsq"
 )
@@ -57,7 +56,12 @@ func (c conSetting) connectDB() {
 }
 
 func (c conSetting) createProducer() {
-
+	var err error
+	config := nsq.NewConfig()
+	producer, err = nsq.NewProducer(c.nsqAddr, config)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 type response struct {
@@ -94,6 +98,7 @@ func insert(w http.ResponseWriter, r *http.Request) {
 
 	if err == nil {
 		res.Message = "Success to Insert"
+		p.publishMessage("insert")
 	} else {
 		fmt.Println(err)
 	}
@@ -135,6 +140,7 @@ func update(w http.ResponseWriter, r *http.Request) {
 
 	if err == nil {
 		res.Message = "Success to Update"
+		p.publishMessage("update")
 	} else {
 		fmt.Println(err)
 	}
@@ -157,6 +163,7 @@ func delete(w http.ResponseWriter, r *http.Request) {
 
 	if err == nil {
 		res.Message = "Success to Delete"
+		p.publishMessage("delete")
 	}
 	json.NewEncoder(w).Encode(res)
 }
@@ -223,5 +230,18 @@ type message struct {
 }
 
 func (p *recipe) publishMessage(action string) {
+	msg := message{
+		ID:     p.ID,
+		Action: action,
+	}
+	payload, err := json.Marshal(msg)
+
+	if err != nil {
+		log.Println(err)
+	}
+	err = producer.Publish("recipes", payload)
+	if err != nil {
+		log.Println(err)
+	}
 
 }
